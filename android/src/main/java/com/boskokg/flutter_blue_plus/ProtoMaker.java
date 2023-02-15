@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import com.boskokg.flutter_blue_plus.Patch;
 /**
  * Created by bosko on 30/01/22.
  */
