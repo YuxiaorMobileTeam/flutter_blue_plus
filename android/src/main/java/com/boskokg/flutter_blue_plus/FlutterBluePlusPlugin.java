@@ -250,19 +250,19 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
             }
 
             case "startScan": {
-                ensurePermissionBeforeAction(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? Manifest.permission.BLUETOOTH_SCAN : Manifest.permission.ACCESS_FINE_LOCATION, (grantedScan, permissionScan) -> {
+                ensurePermissionBeforeAction(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? Manifest.permission.BLUETOOTH_SCAN : null, (grantedScan, permissionScan) -> {
                     if (grantedScan) {
                         ensurePermissionBeforeAction(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? Manifest.permission.BLUETOOTH_CONNECT : null, (grantedConnect, permissionConnect) -> {
                             if (grantedConnect) {
-                                ensurePermissionBeforeAction(Manifest.permission.ACCESS_COARSE_LOCATION, (grandCoarse, permissionCoarse) -> {
-                                    if(grandCoarse) {
+                                startScan(call, result);
+                                ensurePermissionBeforeAction(Manifest.permission.ACCESS_FINE_LOCATION, (grandLocation, permissionLocation) -> {
+                                    if(grandLocation) {
                                         startScan(call, result);
                                     } else {
                                         result.error(
-                                                "no_permissions", String.format("flutter_blue plugin requires %s for scanning", permissionCoarse), null);
+                                                "no_permissions", String.format("flutter_blue plugin requires %s for scanning", permissionLocation), null);
                                     }
                                 });
-
                             } else {
                                 result.error(
                                         "no_permissions", String.format("flutter_blue plugin requires %s for scanning", permissionConnect), null);
