@@ -1,4 +1,4 @@
-// Copyright 2017, Paul DeMarco.
+// Copyright 2023, Charles Weinberger & Paul DeMarco.
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
@@ -13,23 +13,23 @@ class ScanResultTile extends StatelessWidget {
   final VoidCallback? onTap;
 
   Widget _buildTitle(BuildContext context) {
-    if (result.device.name.isNotEmpty) {
+    if (result.device.localName.isNotEmpty) {
       return Column(
         mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            result.device.name,
+            result.device.localName,
             overflow: TextOverflow.ellipsis,
           ),
           Text(
-            result.device.id.toString(),
-            style: Theme.of(context).textTheme.caption,
+            result.device.remoteId.toString(),
+            style: Theme.of(context).textTheme.bodySmall,
           )
         ],
       );
     } else {
-      return Text(result.device.id.toString());
+      return Text(result.device.remoteId.toString());
     }
   }
 
@@ -39,7 +39,7 @@ class ScanResultTile extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(title, style: Theme.of(context).textTheme.caption),
+          Text(title, style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(
             width: 12.0,
           ),
@@ -48,7 +48,7 @@ class ScanResultTile extends StatelessWidget {
               value,
               style: Theme.of(context)
                   .textTheme
-                  .caption
+                  .bodySmall
                   ?.apply(color: Colors.black),
               softWrap: true,
             ),
@@ -92,12 +92,12 @@ class ScanResultTile extends StatelessWidget {
       title: _buildTitle(context),
       leading: Text(result.rssi.toString()),
       trailing: ElevatedButton(
-        child: const Text('CONNECT'),
         style: ElevatedButton.styleFrom(
-          primary: Colors.black,
-          onPrimary: Colors.white,
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
         ),
         onPressed: (result.advertisementData.connectable) ? onTap : null,
+        child: const Text('CONNECT'),
       ),
       children: <Widget>[
         _buildAdvRow(
@@ -136,9 +136,9 @@ class ServiceTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             const Text('Service'),
-            Text('0x${service.uuid.toString().toUpperCase().substring(4, 8)}',
-                style: Theme.of(context).textTheme.bodyText1?.copyWith(
-                    color: Theme.of(context).textTheme.caption?.color))
+            Text('0x${service.serviceUuid.toString().toUpperCase()}',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Theme.of(context).textTheme.bodySmall?.color))
           ],
         ),
         children: characteristicTiles,
@@ -146,19 +146,18 @@ class ServiceTile extends StatelessWidget {
     } else {
       return ListTile(
         title: const Text('Service'),
-        subtitle:
-            Text('0x${service.uuid.toString().toUpperCase().substring(4, 8)}'),
+        subtitle: Text('0x${service.serviceUuid.toString().toUpperCase()}'),
       );
     }
   }
 }
 
-class CharacteristicTile extends StatelessWidget {
+class CharacteristicTile extends StatefulWidget {
   final BluetoothCharacteristic characteristic;
   final List<DescriptorTile> descriptorTiles;
-  final VoidCallback? onReadPressed;
-  final VoidCallback? onWritePressed;
-  final VoidCallback? onNotificationPressed;
+  final Future<void> Function()? onReadPressed;
+  final Future<void> Function()? onWritePressed;
+  final Future<void> Function()? onNotificationPressed;
 
   const CharacteristicTile(
       {Key? key,
@@ -170,12 +169,17 @@ class CharacteristicTile extends StatelessWidget {
       : super(key: key);
 
   @override
+  State<CharacteristicTile> createState() => _CharacteristicTileState();
+}
+
+class _CharacteristicTileState extends State<CharacteristicTile> {
+  @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<int>>(
-      stream: characteristic.value,
-      initialData: characteristic.lastValue,
-      builder: (c, snapshot) {
-        final value = snapshot.data;
+      stream: widget.characteristic.onValueReceived,
+      initialData: widget.characteristic.lastValue,
+      builder: (context, snapshot) {
+        final List<int>? value = snapshot.data;
         return ExpansionTile(
           title: ListTile(
             title: Column(
@@ -184,40 +188,47 @@ class CharacteristicTile extends StatelessWidget {
               children: <Widget>[
                 const Text('Characteristic'),
                 Text(
-                    '0x${characteristic.uuid.toString().toUpperCase().substring(4, 8)}',
-                    style: Theme.of(context).textTheme.bodyText1?.copyWith(
-                        color: Theme.of(context).textTheme.caption?.color))
+                  '0x${widget.characteristic.characteristicUuid.toString().toUpperCase()}',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).textTheme.bodySmall?.color),
+                ),
+                Row(
+                  children: [
+                    if (widget.characteristic.properties.read)
+                      TextButton(
+                          child: const Text("Read"),
+                          onPressed: () async {
+                            await widget.onReadPressed!();
+                            setState(() {});
+                          }),
+                    if (widget.characteristic.properties.write)
+                      TextButton(
+                          child: Text(widget.characteristic.properties
+                                  .writeWithoutResponse
+                              ? "WriteNoResp"
+                              : "Write"),
+                          onPressed: () async {
+                            await widget.onWritePressed!();
+                            setState(() {});
+                          }),
+                    if (widget.characteristic.properties.notify ||
+                        widget.characteristic.properties.indicate)
+                      TextButton(
+                          child: Text(widget.characteristic.isNotifying
+                              ? "Unsubscribe"
+                              : "Subscribe"),
+                          onPressed: () async {
+                            await widget.onNotificationPressed!();
+                            setState(() {});
+                          })
+                  ],
+                )
               ],
             ),
             subtitle: Text(value.toString()),
             contentPadding: const EdgeInsets.all(0.0),
           ),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              IconButton(
-                icon: Icon(
-                  Icons.file_download,
-                  color: Theme.of(context).iconTheme.color?.withOpacity(0.5),
-                ),
-                onPressed: onReadPressed,
-              ),
-              IconButton(
-                icon: Icon(Icons.file_upload,
-                    color: Theme.of(context).iconTheme.color?.withOpacity(0.5)),
-                onPressed: onWritePressed,
-              ),
-              IconButton(
-                icon: Icon(
-                    characteristic.isNotifying
-                        ? Icons.sync_disabled
-                        : Icons.sync,
-                    color: Theme.of(context).iconTheme.color?.withOpacity(0.5)),
-                onPressed: onNotificationPressed,
-              )
-            ],
-          ),
-          children: descriptorTiles,
+          children: widget.descriptorTiles,
         );
       },
     );
@@ -244,15 +255,13 @@ class DescriptorTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           const Text('Descriptor'),
-          Text('0x${descriptor.uuid.toString().toUpperCase().substring(4, 8)}',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyText1
-                  ?.copyWith(color: Theme.of(context).textTheme.caption?.color))
+          Text('0x${descriptor.descriptorUuid.toString().toUpperCase()}',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Theme.of(context).textTheme.bodySmall?.color))
         ],
       ),
       subtitle: StreamBuilder<List<int>>(
-        stream: descriptor.value,
+        stream: descriptor.onValueReceived,
         initialData: descriptor.lastValue,
         builder: (c, snapshot) => Text(snapshot.data.toString()),
       ),
@@ -280,9 +289,10 @@ class DescriptorTile extends StatelessWidget {
 }
 
 class AdapterStateTile extends StatelessWidget {
-  const AdapterStateTile({Key? key, required this.state}) : super(key: key);
+  const AdapterStateTile({Key? key, required this.adapterState})
+      : super(key: key);
 
-  final BluetoothState state;
+  final BluetoothAdapterState adapterState;
 
   @override
   Widget build(BuildContext context) {
@@ -290,14 +300,22 @@ class AdapterStateTile extends StatelessWidget {
       color: Colors.redAccent,
       child: ListTile(
         title: Text(
-          'Bluetooth adapter is ${state.toString().substring(15)}',
-          style: Theme.of(context).primaryTextTheme.subtitle2,
+          'Bluetooth adapter is ${adapterState.toString().split(".").last}',
+          style: Theme.of(context).primaryTextTheme.titleSmall,
         ),
         trailing: Icon(
           Icons.error,
-          color: Theme.of(context).primaryTextTheme.subtitle2?.color,
+          color: Theme.of(context).primaryTextTheme.titleSmall?.color,
         ),
       ),
     );
   }
+}
+
+SnackBar snackBarGood(String message) {
+  return SnackBar(content: Text(message), backgroundColor: Colors.blue);
+}
+
+SnackBar snackBarFail(String message) {
+  return SnackBar(content: Text(message), backgroundColor: Colors.red);
 }
