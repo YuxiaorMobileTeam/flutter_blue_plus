@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.boskokg.flutter_blue_plus;
+package com.lib.flutter_blue_plus;
 
 import android.os.ParcelUuid;
 import android.util.ArrayMap;

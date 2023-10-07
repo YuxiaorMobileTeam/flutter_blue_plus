@@ -104,19 +104,23 @@ if (await FlutterBluePlus.isAvailable == false) {
     return;
 }
 
+// handle bluetooth on & off
+// note: for iOS the initial state is typically BluetoothAdapterState.unknown
+// note: if you have permissions issues you will get stuck at BluetoothAdapterState.unauthorized
+FlutterBluePlus.adapterState.listen((BluetoothAdapterState state) {
+    print(state);
+    if (state == BluetoothAdapterState.on) {
+        // usually start scanning, connecting, etc
+    } else {
+        // show an error to the user, etc
+    }
+});
+
 // turn on bluetooth ourself if we can
 // for iOS, the user controls bluetooth enable/disable
 if (Platform.isAndroid) {
     await FlutterBluePlus.turnOn();
 }
-
-// wait bluetooth to be on & print states
-// note: for iOS the initial state is typically BluetoothAdapterState.unknown
-// note: if you have permissions issues you will get stuck at BluetoothAdapterState.unauthorized
-await FlutterBluePlus.adapterState
- .map((s){print(s);return s;})
- .where((s) => s == BluetoothAdapterState.on)
- .first;
 ```
 
 ### Scan for devices
@@ -131,7 +135,7 @@ var subscription = FlutterBluePlus.scanResults.listen(
     (results) {
         for (ScanResult r in results) {
             if (seen.contains(r.device.remoteId) == false) {
-                print('${r.device.remoteId}: "${r.device.localName}" found! rssi: ${r.rssi}');
+                print('${r.device.remoteId}: "${r.advertisementData.localName}" found! rssi: ${r.rssi}');
                 seen.add(r.device.remoteId);
             }
         }
@@ -376,7 +380,7 @@ flutterBlue.startScan(timeout: Duration(seconds: 4), androidUsesFineLocation: tr
 Add the following line in your `project/android/app/proguard-rules.pro` file:
 
 ```
--keep class com.boskokg.flutter_blue_plus.* { *; }
+-keep class com.lib.flutter_blue_plus.* { *; }
 ```
 
 to avoid seeing the following kind errors in your `release` builds:
@@ -425,22 +429,25 @@ For location permissions on iOS see more at: [https://developer.apple.com/docume
 | isScanningNow          | :white_check_mark: | :white_check_mark: |        | Is a scan currently running?                               |
 | connectedSystemDevices | :white_check_mark: | :white_check_mark: |        | List of already connected devices, including by other apps |
 | setLogLevel            | :white_check_mark: | :white_check_mark: |        | Configure plugin log level                                 |
+| getPhySupport          | :white_check_mark: |                    | :fire: | Get supported bluetooth phy codings                        |
 
 ### BluetoothDevice API
 
 |                           |      Android       |        iOS         | Throws | Description                                                |
 | :------------------------ | :----------------: | :----------------: | :----: | :----------------------------------------------------------|
-| localName                 | :white_check_mark: | :white_check_mark: |        | The cached localName of the device                         |
+| platformName              | :white_check_mark: | :white_check_mark: |        | The platform cached name of the device                     |
+| onNameChanged          🌀 |                    | :white_check_mark: |        | The GAP Device Name Characteristic (0x2A00) changed        |
 | connect                   | :white_check_mark: | :white_check_mark: | :fire: | Establishes a connection to the device                     |
 | disconnect                | :white_check_mark: | :white_check_mark: | :fire: | Cancels an active or pending connection to the device      |
 | discoverServices          | :white_check_mark: | :white_check_mark: | :fire: | Discover services                                          |
 | servicesList              | :white_check_mark: | :white_check_mark: |        | The list of services that were discovered                  |
+| onServicesChanged      🌀 |                    | :white_check_mark: |        | Services changes & must be rediscovered                    |
 | connectionState        🌀 | :white_check_mark: | :white_check_mark: |        | Stream of connection changes for the Bluetooth Device      |
-| bondState              🌀 | :white_check_mark: |                    |        | Stream of device bond state. Can be useful on Android      |
 | mtu                    🌀 | :white_check_mark: | :white_check_mark: | :fire: | Stream of mtu size changes                                 |
 | readRssi                  | :white_check_mark: | :white_check_mark: | :fire: | Read RSSI from a connected device                          |
 | requestMtu                | :white_check_mark: |                    | :fire: | Request to change the MTU for the device                   |
 | requestConnectionPriority | :white_check_mark: |                    | :fire: | Request to update a high priority, low latency connection  |
+| bondState              🌀 | :white_check_mark: |                    |        | Stream of device bond state. Can be useful on Android      |
 | createBond                | :white_check_mark: |                    | :fire: | Force a system pairing dialogue to show, if needed         |
 | removeBond                | :white_check_mark: |                    | :fire: | Remove Bluetooth Bond of device                            |
 | setPreferredPhy           | :white_check_mark: |                    |        | Set preferred RX and TX phy for connection and phy options |
@@ -517,8 +524,8 @@ Try looking through already connected devices:
 // connected to by other apps
 List<BluetoothDevice> system = await FlutterBluePlus.connectedSystemDevices;
 for (var d in system) {
-    print('${r.device.localName} already connected to! ${r.device.remoteId}');
-    if (d.localName == "myBleDevice") {
+    print('${r.device.platformName} already connected to! ${r.device.remoteId}');
+    if (d.platformName == "myBleDevice") {
          await r.connect(); // must connect our app
     }
 }
@@ -570,9 +577,9 @@ Bluetooth is a complicated system service, and can enter a bad state.
 
 Your device will only send values after you call `await characteristic.setNotifyValue(true)`, or `await characteristic.read()`
 
-**2. you are calling write**
+**2. you are calling write instead of read**
 
-`onValueReceived` is only called for reads & notifies.
+`onValueReceived` is only called for reads & notifies, not writes.
 
 You can do a single read with `await characteristic.read(...)`
 
@@ -587,6 +594,26 @@ Try interacting with your device to get it to send new data.
 Try rebooting your ble device. 
 
 Some ble devices have buggy software and stop sending data
+
+---
+
+### onValueReceived data is split up
+
+You are probably forgetting to increase the android mtu.
+
+```dart
+if (Platform.isAndroid) {
+    await device.requestMtu(512);
+}
+```
+
+Verify that the mtu is large enough to hold your message.
+
+```dart
+device.mtu
+```
+
+If it still happens, it is a problem with your peripheral device.
 
 ---
 

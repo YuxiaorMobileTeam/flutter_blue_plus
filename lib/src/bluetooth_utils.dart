@@ -1,19 +1,8 @@
 part of flutter_blue_plus;
 
-enum BluetoothDeviceType { unknown, classic, le, dual }
 
-BluetoothDeviceType _bmToBluetoothDeviceType(BmBluetoothSpecEnum value) {
-  switch (value) {
-    case BmBluetoothSpecEnum.unknown:
-      return BluetoothDeviceType.unknown;
-    case BmBluetoothSpecEnum.classic:
-      return BluetoothDeviceType.classic;
-    case BmBluetoothSpecEnum.le:
-      return BluetoothDeviceType.le;
-    case BmBluetoothSpecEnum.dual:
-      return BluetoothDeviceType.dual;
-  }
-}
+/// State of the bluetooth adapter.
+enum BluetoothAdapterState { unknown, unavailable, unauthorized, turningOn, on, turningOff, off }
 
 class DisconnectReason {
   final ErrorPlatform platform;
@@ -92,7 +81,7 @@ BluetoothBondState _bmToBluetoothBondState(BmBondStateResponse value) {
 }
 
 // [none] no bond
-// [bonding] bonding is underway
+// [bonding] bonding is in progress
 // [bonded] bond success
 // [failed] a bonding attempt failed
 // [lost] a previous bond was deleted (you should reconnect to force a rebond)
@@ -124,3 +113,9 @@ enum PhyOption { noPreferred, s2, s8 }
 
 @Deprecated('Use Phy instead')
 enum PhyType { le1m, le2m, leCoded }
+
+@Deprecated('Use BluetoothConnectionState instead')
+enum BluetoothDeviceState { disconnected, connecting, connected, disconnecting }
+
+@Deprecated('Use BluetoothAdapterState instead')
+enum BluetoothState { unknown, unavailable, unauthorized, turningOn, on, turningOff, off }

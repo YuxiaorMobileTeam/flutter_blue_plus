@@ -1,9 +1,7 @@
 part of flutter_blue_plus;
 
 String _hexEncode(List<int> numbers) {
-  return numbers
-      .map((n) => (n & 0xFF).toRadixString(16).padLeft(2, '0'))
-      .join();
+  return numbers.map((n) => (n & 0xFF).toRadixString(16).padLeft(2, '0')).join();
 }
 
 List<int> _hexDecode(String hex) {
@@ -43,6 +41,7 @@ int _compareAsciiLowerCase(String a, String b) {
 }
 
 extension AddOrUpdate<T> on List<T> {
+  /// add an item to a list, or update item if it already exists
   void addOrUpdate(T item) {
     final index = indexOf(item);
     if (index != -1) {
@@ -55,9 +54,9 @@ extension AddOrUpdate<T> on List<T> {
 
 extension FutureTimeout<T> on Future<T> {
   Future<T> fbpTimeout(int seconds, String errorName) {
-    return timeout(Duration(seconds: seconds), onTimeout: () {
-      throw FlutterBluePlusException(ErrorPlatform.dart, errorName,
-          FbpErrorCode.timeout.index, "Timed out after ${seconds}s");
+    return this.timeout(Duration(seconds: seconds), onTimeout: () {
+      throw FlutterBluePlusException(
+          ErrorPlatform.dart, errorName, FbpErrorCode.timeout.index, "Timed out after ${seconds}s");
     });
   }
 }
@@ -71,7 +70,7 @@ class _StreamController<T> {
 
   final StreamController<T> _controller = StreamController<T>.broadcast();
 
-  _StreamController({required T initialValue}) : latestValue = initialValue;
+  _StreamController({required T initialValue}) : this.latestValue = initialValue;
 
   Stream<T> get stream => _controller.stream;
 
@@ -82,11 +81,9 @@ class _StreamController<T> {
     _controller.add(newValue);
   }
 
-  void listen(Function(T) onData,
-      {Function? onError, void Function()? onDone, bool? cancelOnError}) {
+  void listen(Function(T) onData, {Function? onError, void Function()? onDone, bool? cancelOnError}) {
     onData(latestValue);
-    _controller.stream.listen(onData,
-        onError: onError, onDone: onDone, cancelOnError: cancelOnError);
+    _controller.stream.listen(onData, onError: onError, onDone: onDone, cancelOnError: cancelOnError);
   }
 
   Future<void> close() {
@@ -192,8 +189,7 @@ class _OnDoneTransformer<T> extends StreamTransformerBase<T, T> {
 
     controller = StreamController<T>.broadcast(
       onListen: () {
-        subscription = stream
-            .listen(controller?.add, onError: controller?.addError, onDone: () {
+        subscription = stream.listen(controller?.add, onError: controller?.addError, onDone: () {
           onDone();
           controller?.close();
         });
@@ -281,8 +277,7 @@ class _OnCancelTransformer<T> extends StreamTransformerBase<T, T> {
 }
 
 // Helper for 'newStreamWithInitialValue' method for streams.
-class _NewStreamWithInitialValueTransformer<T>
-    extends StreamTransformerBase<T, T> {
+class _NewStreamWithInitialValueTransformer<T> extends StreamTransformerBase<T, T> {
   final T initialValue;
 
   _NewStreamWithInitialValueTransformer(this.initialValue);
@@ -370,8 +365,7 @@ Stream<T> _mergeStreams<T>(List<Stream<T>> streams) {
   }
 
   void subscribeToStream(Stream<T> stream) {
-    final s =
-        stream.listen(handleData, onError: handleError, onDone: handleDone);
+    final s = stream.listen(handleData, onError: handleError, onDone: handleDone);
     subscriptions.add(s);
   }
 
@@ -445,6 +439,7 @@ String _brown(String s) {
 }
 
 extension FirstWhereOrNullExtension<T> on Iterable<T> {
+  /// returns first item to satisfy `test`, else null
   T? _firstWhereOrNull(bool Function(T) test) {
     for (var element in this) {
       if (test(element)) {
@@ -454,3 +449,13 @@ extension FirstWhereOrNullExtension<T> on Iterable<T> {
     return null;
   }
 }
+
+extension RemoveWhere<T> on List<T> {
+  /// returns true if some items where removed
+  bool _removeWhere(bool Function(T) test) {
+    int initialLength = this.length;
+    this.removeWhere(test);
+    return this.length != initialLength;
+  }
+}
+
