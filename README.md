@@ -97,9 +97,9 @@ Setting `LogLevel.verbose` shows *all* data in and out.
 **Note:** On iOS, a "*This app would like to use Bluetooth*" system dialogue appears on first call to any FlutterBluePlus method. 
  
 ```dart
-// check adapter availability
+// check if bluetooth is supported by your hardware
 // Note: The platform is initialized on the first call to any FlutterBluePlus method.
-if (await FlutterBluePlus.isAvailable == false) {
+if (await FlutterBluePlus.isSupported == false) {
     print("Bluetooth not supported by this device");
     return;
 }
@@ -144,7 +144,6 @@ var subscription = FlutterBluePlus.scanResults.listen(
 );
 
 // Start scanning
-// Note: You should always call `scanResults.listen` before you call startScan!
 await FlutterBluePlus.startScan();
 
 // Stop scanning
@@ -165,7 +164,6 @@ device.connectionState.listen((BluetoothConnectionState state) async {
 });
 
 // Connect to the device
-// Note: You should always call `connectionState.listen` before you call connect!
 await device.connect();
 
 // Disconnect from device
@@ -419,7 +417,7 @@ For location permissions on iOS see more at: [https://developer.apple.com/docume
 
 |                        |      Android       |        iOS         | Throws | Description                                                |
 | :--------------------- | :----------------: | :----------------: | :----: | :----------------------------------------------------------|
-| isAvailable            | :white_check_mark: | :white_check_mark: |        | Checks whether the device supports Bluetooth               |
+| isSupported            | :white_check_mark: | :white_check_mark: |        | Checks whether the device supports Bluetooth               |
 | turnOn                 | :white_check_mark: |                    | :fire: | Turns on the bluetooth adapter                             |
 | adapterState        🌀 | :white_check_mark: | :white_check_mark: |        | Stream of on & off states of the bluetooth adapter         |
 | startScan              | :white_check_mark: | :white_check_mark: | :fire: | Starts a scan for Ble devices                              |

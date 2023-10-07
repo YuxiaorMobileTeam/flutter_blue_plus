@@ -234,7 +234,7 @@ public class FlutterBluePlusPlugin implements
                 "flutterHotRestart".equals(call.method) == false &&
                 "connectedCount".equals(call.method) == false &&
                 "setLogLevel".equals(call.method) == false &&
-                "isAvailable".equals(call.method) == false &&
+                "isSupported".equals(call.method) == false &&
                 "getAdapterName".equals(call.method) == false &&
                 "getAdapterState".equals(call.method) == false) {
                 result.error("bluetoothUnavailable", "the device does not have bluetooth", null);
@@ -285,7 +285,7 @@ public class FlutterBluePlusPlugin implements
                     break;
                 }
 
-                case "isAvailable":
+                case "isSupported":
                 {
                     result.success(mBluetoothAdapter != null);
                     break;
@@ -2070,16 +2070,16 @@ public class FlutterBluePlusPlugin implements
         }
         switch(level) {
             case DEBUG:
-                Log.d(TAG, "[FBP]" + message);
+                Log.d(TAG, "[FBP] " + message);
                 break;
             case WARNING:
-                Log.w(TAG, "[FBP]" + message);
+                Log.w(TAG, "[FBP] " + message);
                 break;
             case ERROR:
-                Log.e(TAG, "[FBP]" + message);
+                Log.e(TAG, "[FBP] " + message);
                 break;
             default:
-                Log.d(TAG, "[FBP]" + message);
+                Log.d(TAG, "[FBP] " + message);
                 break;
         }
     }

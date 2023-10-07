@@ -53,11 +53,46 @@ extension AddOrUpdate<T> on List<T> {
 }
 
 extension FutureTimeout<T> on Future<T> {
-  Future<T> fbpTimeout(int seconds, String errorName) {
+  Future<T> fbpTimeout(int seconds, String function) {
     return this.timeout(Duration(seconds: seconds), onTimeout: () {
       throw FlutterBluePlusException(
-          ErrorPlatform.dart, errorName, FbpErrorCode.timeout.index, "Timed out after ${seconds}s");
+          ErrorPlatform.dart, function, FbpErrorCode.timeout.index, "Timed out after ${seconds}s");
     });
+  }
+
+  Future<T> fbpEnsureConnected(BluetoothDevice device, String function) {
+    // Create a completer to represent the result of this extended Future.
+    var completer = Completer<T>();
+
+    // disconnection listener.
+    var subscription = device.connectionState.listen((event) {
+      if (event == BluetoothConnectionState.disconnected) {
+        if (!completer.isCompleted) {
+          completer.completeError(FlutterBluePlusException(
+            ErrorPlatform.dart, 
+            function, 
+            FbpErrorCode.deviceIsDisconnected.index, 
+            "Device is disconnected"
+          ));
+        }
+      }
+    });
+
+    // When the original future completes
+    // complete our completer and cancel the subscription.
+    this.then((value) {
+      if (!completer.isCompleted) {
+        subscription.cancel();
+        completer.complete(value);
+      }
+    }).catchError((error) {
+      if (!completer.isCompleted) {
+        subscription.cancel();
+        completer.completeError(error);
+      }
+    });
+
+    return completer.future;
   }
 }
 
@@ -72,7 +107,11 @@ class _StreamController<T> {
 
   _StreamController({required T initialValue}) : this.latestValue = initialValue;
 
-  Stream<T> get stream => _controller.stream;
+  Stream<T> get stream {
+    return latestValue != null
+      ? _controller.stream.newStreamWithInitialValue(latestValue!)
+      : _controller.stream;
+  }
 
   T get value => latestValue;
 
@@ -149,8 +188,9 @@ class _OnDoneTransformer<T> extends StreamTransformerBase<T, T> {
   Stream<T> bind(Stream<T> stream) {
     if (stream.isBroadcast) {
       return _bindBroadcast(stream);
+    } else {
+      return _bindSingleSubscription(stream);
     }
-    return _bindSingleSubscription(stream);
   }
 
   Stream<T> _bindSingleSubscription(Stream<T> stream) {
@@ -214,9 +254,9 @@ class _OnCancelTransformer<T> extends StreamTransformerBase<T, T> {
   Stream<T> bind(Stream<T> stream) {
     if (stream.isBroadcast) {
       return _bindBroadcast(stream);
+    } else {
+      return _bindSingleSubscription(stream);
     }
-
-    return _bindSingleSubscription(stream);
   }
 
   Stream<T> _bindSingleSubscription(Stream<T> stream) {
@@ -284,7 +324,11 @@ class _NewStreamWithInitialValueTransformer<T> extends StreamTransformerBase<T, 
 
   @override
   Stream<T> bind(Stream<T> stream) {
-    return _bindSingleSubscription(stream);
+    if (stream.isBroadcast) {
+      return _bindBroadcast(stream);
+    } else {
+      return _bindSingleSubscription(stream);
+    }
   }
 
   Stream<T> _bindSingleSubscription(Stream<T> stream) {
@@ -313,6 +357,27 @@ class _NewStreamWithInitialValueTransformer<T> extends StreamTransformerBase<T, 
       },
       onCancel: () {
         return subscription?.cancel();
+      },
+      sync: true,
+    );
+
+    return controller.stream;
+  }
+
+  Stream<T> _bindBroadcast(Stream<T> stream) {
+    StreamController<T>? controller;
+    StreamSubscription<T>? subscription;
+
+    controller = StreamController<T>.broadcast(
+      onListen: () {
+        // Emit the initial value
+        controller?.add(initialValue);
+        subscription = stream.listen(controller?.add, onError: controller?.addError, onDone: () {
+          controller?.close();
+        });
+      },
+      onCancel: () {
+        subscription?.cancel();
       },
       sync: true,
     );
@@ -458,4 +523,3 @@ extension RemoveWhere<T> on List<T> {
     return this.length != initialLength;
   }
 }
-
