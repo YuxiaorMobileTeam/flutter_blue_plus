@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 import '../widgets/service_tile.dart';
-import '../snackbar.dart';
-import '../extra.dart';
+import '../utils/snackbar.dart';
+import '../utils/extra.dart';
 
 class DeviceScreen extends StatefulWidget {
   final BluetoothDevice device;
@@ -35,6 +35,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
     _connectionStateSubscription = widget.device.connectionState.listen((state) async {
       _connectionState = state;
+      if (state == BluetoothConnectionState.connected) {
+        _services = []; // must rediscover services
+      }
       if (state == BluetoothConnectionState.connected && _rssi == null) {
         _rssi = await widget.device.readRssi();
       }
