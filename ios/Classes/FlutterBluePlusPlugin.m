@@ -128,6 +128,8 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
         // check that we have an adapter, except for the 
         // functions that don't need it
         if (self.centralManager == nil && 
+            [@"flutterHotRestart" isEqualToString:call.method] == false &&
+            [@"connectedCount" isEqualToString:call.method] == false &&
             [@"setLogLevel" isEqualToString:call.method] == false &&
             [@"isAvailable" isEqualToString:call.method] == false &&
             [@"getAdapterName" isEqualToString:call.method] == false &&
@@ -139,17 +141,32 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 
         if ([@"flutterHotRestart" isEqualToString:call.method])
         {
-            [self->_centralManager stopScan];
+            // no adapter?
+            if (self.centralManager == nil) {
+                result(@(0)); // no work to do
+                return;
+            }
 
-            [self disconnectAllDevices];
+            [self.centralManager stopScan];
+
+            [self disconnectAllDevices:false];
 
             NSLog(@"[FBP-iOS] connectedPeripherals: %lu", self.connectedPeripherals.count);
 
             if (self.connectedPeripherals.count == 0) {
                 [self.knownPeripherals removeAllObjects];
-                NSLog(@"[FBP-iOS] HotRestart: complete");
             }
             
+            result(@(self.connectedPeripherals.count));
+            return;
+        }
+        else if ([@"connectedCount" isEqualToString:call.method])
+        {
+            NSLog(@"[FBP-iOS] connectedPeripherals: %lu", self.connectedPeripherals.count);
+            if (self.connectedPeripherals.count == 0) {
+                NSLog(@"[FBP-iOS] Hot Restart: complete");
+                [self.knownPeripherals removeAllObjects];
+            }
             result(@(self.connectedPeripherals.count));
             return;
         }
@@ -795,7 +812,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     return nil;
 }
 
-- (void)disconnectAllDevices
+- (void)disconnectAllDevices:(bool)isAdapterOff
 {
     NSLog(@"[FBP-iOS] disconnectAllDevices");
 
@@ -804,7 +821,32 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     {
         CBPeripheral *peripheral = [self.connectedPeripherals objectForKey:key];
         NSLog(@"[FBP-iOS] calling disconnect: %@", key);
-        [self.centralManager cancelPeripheralConnection:peripheral];
+
+        // inexplicably, iOS does not call 'didDisconnectPeripheral' when
+        // the adapter is turned off, so we must send these responses manually
+        if (isAdapterOff) {
+            // See BmConnectionStateResponse
+            NSDictionary *result = @{
+                @"remote_id":                [[peripheral identifier] UUIDString],
+                @"connection_state":         @([self bmConnectionStateEnum:CBPeripheralStateDisconnected]),
+                @"disconnect_reason_code":   @(57), // just a random value, could be anything.
+                @"disconnect_reason_string": @"Bluetooth turned off",
+            };
+
+            // Send connection state
+            [_methodChannel invokeMethod:@"OnConnectionStateChanged" arguments:result];
+        } else {
+            // request disconnection
+            // Note: when the adapter is turned off, it is an 'api misuse'
+            // to call cancelPeripheralConnection as it is implicit
+            [self.centralManager cancelPeripheralConnection:peripheral];
+        }
+    }
+
+    // iOS does not call 'didDisconnectPeripheral' after the
+    //  adapter is turned off, so we must clear this ourself
+    if (isAdapterOff) {
+        [self.connectedPeripherals removeAllObjects];
     }
 
     // note: we do *not* clear self.knownPeripherals
@@ -887,8 +929,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 
     // was the adapter turned off?
     if (self->_centralManager.state != CBManagerStatePoweredOn) {
-        [self disconnectAllDevices];
-        [self.connectedPeripherals removeAllObjects];
+        [self disconnectAllDevices:true];
     }
 
     int adapterState = [self bmAdapterStateEnum:self->_centralManager.state];
@@ -1422,7 +1463,6 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 {
     return @{
         @"remote_id":   [[peripheral identifier] UUIDString],
-        @"local_name":  [peripheral name] ? [peripheral name] : [NSNull null],
         @"type":        @(2), // hardcode to BLE. Does iOS differentiate?
     };
 }

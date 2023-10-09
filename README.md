@@ -104,19 +104,23 @@ if (await FlutterBluePlus.isAvailable == false) {
     return;
 }
 
+// handle bluetooth on & off
+// note: for iOS the initial state is typically BluetoothAdapterState.unknown
+// note: if you have permissions issues you will get stuck at BluetoothAdapterState.unauthorized
+FlutterBluePlus.adapterState.listen((BluetoothAdapterState state) {
+    print(state);
+    if (state == BluetoothAdapterState.on) {
+        // usually start scanning, connecting, etc
+    } else {
+        // show an error to the user, etc
+    }
+});
+
 // turn on bluetooth ourself if we can
 // for iOS, the user controls bluetooth enable/disable
 if (Platform.isAndroid) {
     await FlutterBluePlus.turnOn();
 }
-
-// wait bluetooth to be on & print states
-// note: for iOS the initial state is typically BluetoothAdapterState.unknown
-// note: if you have permissions issues you will get stuck at BluetoothAdapterState.unauthorized
-await FlutterBluePlus.adapterState
- .map((s){print(s);return s;})
- .where((s) => s == BluetoothAdapterState.on)
- .first;
 ```
 
 ### Scan for devices
@@ -570,9 +574,9 @@ Bluetooth is a complicated system service, and can enter a bad state.
 
 Your device will only send values after you call `await characteristic.setNotifyValue(true)`, or `await characteristic.read()`
 
-**2. you are calling write**
+**2. you are calling write instead of read**
 
-`onValueReceived` is only called for reads & notifies.
+`onValueReceived` is only called for reads & notifies, not writes.
 
 You can do a single read with `await characteristic.read(...)`
 
